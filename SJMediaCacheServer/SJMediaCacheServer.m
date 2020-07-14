@@ -12,7 +12,6 @@
 #import "MCSResource.h"
 #import "MCSURLRecognizer.h"
 #import "MCSSessionTask.h"
-#import "MCSURLRecognizer.h"
 #import "MCSLogger.h"
 #import "MCSDownload.h"
 
@@ -36,6 +35,8 @@
         _server = [MCSProxyServer.alloc initWithPort:2000];
         _server.delegate = self;
         [_server start];
+        
+        MCSURLRecognizer.shared.server = _server;
     }
     return self;
 }
@@ -51,10 +52,37 @@
     
     // proxy URL
     if ( _server.isRunning )
-        return [MCSURLRecognizer.shared proxyURLWithURL:URL localServerURL:_server.serverURL];
+        return [MCSURLRecognizer.shared proxyURLWithURL:URL];
 
     // param URL
     return URL;
+}
+
+- (void)setMaxConcurrentPrefetchCount:(NSInteger)maxConcurrentPrefetchCount {
+    MCSPrefetcherManager.shared.maxConcurrentPrefetchCount = maxConcurrentPrefetchCount;
+}
+ 
+- (NSInteger)maxConcurrentPrefetchCount {
+    return MCSPrefetcherManager.shared.maxConcurrentPrefetchCount;
+}
+
+- (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)preloadSize {
+    return [MCSPrefetcherManager.shared prefetchWithURL:URL preloadSize:preloadSize];
+}
+
+- (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)preloadSize progress:(void(^_Nullable)(float progress))progressBlock completed:(void(^_Nullable)(NSError *_Nullable error))completionBlock {
+    return [MCSPrefetcherManager.shared prefetchWithURL:URL preloadSize:preloadSize progress:progressBlock completed:completionBlock];
+}
+
+- (void)cancelCurrentRequestsForURL:(NSURL *)URL {
+    if ( URL == nil )
+        return;
+    MCSResource *resource = [MCSResourceManager.shared resourceWithURL:URL];
+    [MCSResourceManager.shared cancelCurrentReadsForResource:resource];
+}
+
+- (void)cancelAllPrefetchTasks {
+    [MCSPrefetcherManager.shared cancelAllPrefetchTasks];
 }
 
 #pragma mark - MCSProxyServerDelegate
@@ -74,6 +102,14 @@
     return MCSDownload.shared.requestHandler;
 }
 
+- (void)resourceURL:(NSURL *)URL setValue:(nullable NSString *)value forHTTPAdditionalHeaderField:(NSString *)field ofType:(MCSDataType)type {
+    MCSResource *resource = [MCSResourceManager.shared resourceWithURL:URL];
+    [resource.configuration setValue:value forHTTPAdditionalHeaderField:field ofType:type];
+}
+- (nullable NSDictionary *)resourceURL:(NSURL *)URL HTTPAdditionalHeadersForDataRequestsOfType:(MCSDataType)type {
+    MCSResource *resource = [MCSResourceManager.shared resourceWithURL:URL];
+    return [resource.configuration HTTPAdditionalHeadersForDataRequestsOfType:type];
+}
 @end
 
 
@@ -144,6 +180,15 @@
 }
 
 - (void)removeAllCaches {
-    [MCSResourceManager.shared removeAllCaches];
+    [MCSResourceManager.shared removeAllResources];
 }
+
+- (void)removeCacheForURL:(NSURL *)URL {
+    [MCSResourceManager.shared removeResourceForURL:URL];
+}
+
+- (NSUInteger)cachedSize {
+    return [MCSResourceManager.shared cachedSizeForResources];
+}
+
 @end

@@ -20,6 +20,12 @@ typedef NS_ENUM(NSUInteger, MCSErrorCode) {
 //    MCSOutOfDiskSpaceError        = 100004,
     
     MCSHLSFileParseError           = 100005,
+    
+    MCSHLSAESKeyWriteFailedError   = 100006,
+    
+    MCSFileNotExistError           = 100007,
+    
+    MCSUserCancelledError          = 100008,
 };
 
 FOUNDATION_EXTERN NSString * const MCSErrorDomain;
@@ -29,14 +35,20 @@ FOUNDATION_EXTERN NSString * const MCSErrorUserInfoResponseKey;
 
 
 @interface NSError (MCSExtended)
-+ (NSError *)mcs_errorForResponseUnavailable:(NSURL *)URL request:(NSURLRequest *)request response:(NSURLResponse *)response;
++ (NSError *)mcs_responseUnavailable:(NSURL *)URL request:(NSURLRequest *)request response:(NSURLResponse *)response;
 
-+ (NSError *)mcs_errorForNonsupportContentType:(NSURL *)URL request:(NSURLRequest *)request response:(NSURLResponse *)response;
++ (NSError *)mcs_nonsupportContentType:(NSURL *)URL request:(NSURLRequest *)request response:(NSURLResponse *)response;
 
-+ (NSError *)mcs_errorForException:(NSException *)exception;
++ (NSError *)mcs_exception:(NSException *)exception;
 
-+ (NSError *)mcs_errorForRemovedResource:(NSURL *)URL;
++ (NSError *)mcs_removedResource:(NSURL *)URL;
 
-+ (NSError *)mcs_errorForHLSFileParseError:(NSURL *)URL;
++ (NSError *)mcs_HLSFileParseError:(NSURL *)URL;
+
++ (NSError *)mcs_HLSAESKeyWriteFailedError:(NSURL *)URL;
+
++ (NSError *)mcs_fileNotExistError:(NSURL *)URL;
+
++ (NSError *)mcs_userCancelledError:(NSURL *)URL;
 @end
 NS_ASSUME_NONNULL_END

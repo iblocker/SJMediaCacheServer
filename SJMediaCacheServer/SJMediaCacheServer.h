@@ -11,6 +11,8 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "MCSPrefetcherManager.h"
+#import "MCSDefines.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -24,18 +26,74 @@ NS_ASSUME_NONNULL_BEGIN
 /// @return         It may return the local cache playback URL or HTTP proxy URL, but when there is no cache file and the proxy service is not running, it will return the parameter URL.
 ///
 - (NSURL *)playbackURLWithURL:(NSURL *)URL; // 获取播放地址
+ 
+/// The maximum number of queued prefetch tasks that can execute at same time.
+///
+///     The default value is 3.
+///
+@property (nonatomic) NSInteger maxConcurrentPrefetchCount;
 
+/// Prefetch some resources in the cache for future use. resources are downloaded in low priority.
+///
+/// @param URL      An instance of NSURL that references a media resource.
+///
+/// @param bytes    Preload size in bytes.
+///
+/// @return The task to cancel the current prefetching.
+///
+- (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)bytes; // 预加载
+
+/// Prefetch some resources in the cache for future use. resources are downloaded in low priority.
+///
+/// @param URL      An instance of NSURL that references a media resource.
+///
+/// @param bytes    Preload size in bytes.
+///
+/// @param progressBlock   This block will be invoked when progress updates.
+///
+/// @param completionBlock This block will be invoked when the current prefetching is completed. If an error occurred, an error object indicating how the prefetch failed, otherwise nil.
+///
+/// @return The task to cancel the current prefetching.
+///
+- (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)bytes progress:(void(^_Nullable)(float progress))progressBlock completed:(void(^_Nullable)(NSError *_Nullable error))completionBlock; // 预加载
+
+/// Cancel current requests for a resource, including prefetch requests.
+///
+/// @param URL      An instance of NSURL that references a media resource.
+///
+- (void)cancelCurrentRequestsForURL:(NSURL *)URL; // 取消当前的请求, 包括预加载(MCSPrefetchTask)的请求
+
+/// Cancels all queued and executing prefetch tasks.
+///
+- (void)cancelAllPrefetchTasks; // 取消所有的预加载任务
 @end
 
 
 @interface SJMediaCacheServer (Request)
 
-/// Add a request header or something to a request.
+/// Add a request header or something to a data request.
 ///
 ///     This block will be invoked when the download server creates new download task.
 ///
 @property (nonatomic, copy, nullable) NSMutableURLRequest *_Nullable(^requestHandler)(NSMutableURLRequest *request); // 为下载请求添加请求头或做一些其他事情
 
+/// Sets a value for the header field.
+///
+/// @param URL      An instance of NSURL that references a media resource.
+///
+/// @param value    The new value for the header field. Any existing value for the field is replaced by the new value.
+///
+/// @param field    The name of the header field to set. In keeping with the HTTP RFC, HTTP header field names are case insensitive.
+///
+/// @param type     The data type of a partial content in the resource. For example, MCSDataTypeHLSPlaylist indicates setting the header for the request of the m3u8 playlist file.
+///
+- (void)resourceURL:(NSURL *)URL setValue:(nullable NSString *)value forHTTPAdditionalHeaderField:(NSString *)field ofType:(MCSDataType)type;
+
+/// A dictionary of additional headers to send with the resource data requests.
+///
+///     Note that these headers are added to the request only if not already present.
+///
+- (nullable NSDictionary<NSString *, NSString *> *)resourceURL:(NSURL *)URL HTTPAdditionalHeadersForDataRequestsOfType:(MCSDataType)type;
 @end
 
 
@@ -81,7 +139,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///     If 0, there is no count limit. The default value is 0.
 ///
-///     This is not a strict limit—if the cache goes over the limit, a resource in the cache could be evicted instantly, later, or possibly never, depending on the usage details of the resource.
+///     This is not a strict limit—if the cache goes over the limit, a resource in the cache could be removed instantly, later, or possibly never, depending on the usage details of the resource.
 ///
 @property (nonatomic) NSUInteger cacheCountLimit; // 个数限制
 
@@ -108,5 +166,13 @@ NS_ASSUME_NONNULL_BEGIN
 /// Empties the cache. This method may blocks the calling thread until file delete finished.
 ///
 - (void)removeAllCaches; // 删除全部缓存
+
+/// Removes the cache of the specified URL.
+///
+- (void)removeCacheForURL:(NSURL *)URL; // 删除某个缓存
+
+/// Returns the total cache size (in bytes).
+///
+@property (nonatomic, readonly) NSUInteger cachedSize; // 返回已占用的缓存大小
 @end
 NS_ASSUME_NONNULL_END
