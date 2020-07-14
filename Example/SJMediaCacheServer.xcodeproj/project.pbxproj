@@ -241,7 +241,7 @@
 				ORGANIZATIONNAME = "changsanjiang@gmail.com";
 				TargetAttributes = {
 					6003F589195388D20070C39A = {
-						DevelopmentTeam = U5A7L7SMNP;
+						DevelopmentTeam = 23D6YEXPCV;
 					};
 					6003F5AD195388D20070C39A = {
 						TestTargetID = 6003F589195388D20070C39A;
@@ -497,7 +497,7 @@
 			baseConfigurationReference = A62B7547D90D17141E5579C3 /* Pods-SJMediaCacheServer_Example.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = U5A7L7SMNP;
+				DEVELOPMENT_TEAM = 23D6YEXPCV;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "SJMediaCacheServer/SJMediaCacheServer-Prefix.pch";
 				INFOPLIST_FILE = "SJMediaCacheServer/SJMediaCacheServer-Info.plist";
@@ -514,7 +514,7 @@
 			baseConfigurationReference = B54C6837CBAA07093C7830B7 /* Pods-SJMediaCacheServer_Example.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = U5A7L7SMNP;
+				DEVELOPMENT_TEAM = 23D6YEXPCV;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "SJMediaCacheServer/SJMediaCacheServer-Prefix.pch";
 				INFOPLIST_FILE = "SJMediaCacheServer/SJMediaCacheServer-Info.plist";
