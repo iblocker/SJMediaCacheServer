@@ -42,6 +42,8 @@
 }
 
 - (NSURL *)playbackURLWithURL:(NSURL *)URL {
+    NSParameterAssert(URL);
+    
     if ( URL.isFileURL )
         return URL;
     MCSResource *resource = [MCSResourceManager.shared resourceWithURL:URL];
@@ -67,10 +69,14 @@
 }
 
 - (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)preloadSize {
+    NSParameterAssert(URL);
+    
     return [MCSPrefetcherManager.shared prefetchWithURL:URL preloadSize:preloadSize];
 }
 
 - (id<MCSPrefetchTask>)prefetchWithURL:(NSURL *)URL preloadSize:(NSUInteger)preloadSize progress:(void(^_Nullable)(float progress))progressBlock completed:(void(^_Nullable)(NSError *_Nullable error))completionBlock {
+    NSParameterAssert(URL);
+    
     return [MCSPrefetcherManager.shared prefetchWithURL:URL preloadSize:preloadSize progress:progressBlock completed:completionBlock];
 }
 
@@ -147,6 +153,15 @@
 - (BOOL)isEnabledConsoleLog {
     return MCSLogger.shared.enabledConsoleLog;
 }
+
+- (void)setLogOptions:(MCSLogOptions)logOptions {
+    MCSLogger.shared.options = logOptions;
+}
+
+- (MCSLogOptions)logOptions {
+    return MCSLogger.shared.options;
+}
+
 @end
 
 @implementation SJMediaCacheServer (Cache)
@@ -180,6 +195,8 @@
 }
 
 - (void)removeAllCaches {
+    [MCSDownload.shared cancelAllDownloadTasks];
+    [MCSPrefetcherManager.shared cancelAllPrefetchTasks];
     [MCSResourceManager.shared removeAllResources];
 }
 

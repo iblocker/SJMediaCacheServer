@@ -7,21 +7,30 @@
 //
 
 #import "MCSUtils.h"
+#ifdef DEBUG
+#include <mach/mach_time.h>
+#endif
 
 MCSResponseContentRange
 MCSGetResponseContentRange(NSHTTPURLResponse *response) {
-    NSDictionary *responseHeaders = response.allHeaderFields;
-    NSString *bytes = responseHeaders[@"Content-Range"];
-    if ( bytes.length == 0 )
-        return (MCSResponseContentRange){NSNotFound, NSNotFound, NSNotFound};
-    
-    NSString *prefix = @"bytes ";
-    NSString *rangeString = [bytes substringWithRange:NSMakeRange(prefix.length, bytes.length - prefix.length)];
-    NSArray<NSString *> *components = [rangeString componentsSeparatedByString:@"-"];
-    NSUInteger start = (NSUInteger)[components.firstObject longLongValue];
-    NSUInteger end = (NSUInteger)[components.lastObject longLongValue];
-    NSUInteger totalLength = (NSUInteger)[components.lastObject.lastPathComponent longLongValue];
-    return (MCSResponseContentRange){start, end, totalLength};
+    if ( response.statusCode == 206 ) {
+        NSDictionary *responseHeaders = response.allHeaderFields;
+        NSString *bytes = responseHeaders[@"Content-Range"];
+        if ( bytes.length != 0 ) {
+            NSString *prefix = @"bytes ";
+            NSString *rangeString = [bytes substringWithRange:NSMakeRange(prefix.length, bytes.length - prefix.length)];
+            NSArray<NSString *> *components = [rangeString componentsSeparatedByString:@"-"];
+            NSUInteger start = (NSUInteger)[components.firstObject longLongValue];
+            NSUInteger end = (NSUInteger)[components.lastObject longLongValue];
+            NSUInteger totalLength = (NSUInteger)[components.lastObject.lastPathComponent longLongValue];
+            return (MCSResponseContentRange){start, end, totalLength};
+        }
+    }
+    else if ( response.statusCode == 200 ) {
+        return (MCSResponseContentRange){0, response.expectedContentLength - 1, response.expectedContentLength};
+    }
+
+    return (MCSResponseContentRange){NSNotFound, NSNotFound, NSNotFound};
 }
 
 NSRange
@@ -176,3 +185,39 @@ BOOL
 MCSNSRangeContains(NSRange main, NSRange sub) {
     return (main.location <= sub.location) && (main.location + main.length >= sub.location + sub.length);
 }
+
+NSString *
+MCSSuggestedFilePathExtension(NSHTTPURLResponse *response) {
+    NSString *extension = response.suggestedFilename.pathExtension;
+    if ( extension.length != 0 )
+        return extension;
+    
+    NSString *contentType = MCSGetResponseContentType(response);
+    return contentType.lastPathComponent;
+}
+
+#ifdef DEBUG
+uint64_t
+MCSTimerStart(void) {
+    return mach_absolute_time();
+}
+
+NSTimeInterval
+MCSTimerMilePost(uint64_t elapsed_time) {
+    static dispatch_once_t justOnce;
+    static double scale;
+    
+    dispatch_once(&justOnce, ^{
+        mach_timebase_info_data_t tbi;
+        mach_timebase_info(&tbi);
+        scale = tbi.numer;
+        scale = scale/tbi.denom;
+    });
+    
+    uint64_t now = mach_absolute_time() - elapsed_time;
+    double  fTotalT = now;
+    fTotalT = fTotalT * scale;          // convert this to nanoseconds...
+    fTotalT = fTotalT / 1000000000.0;
+    return fTotalT;
+}
+#endif

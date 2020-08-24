@@ -10,39 +10,33 @@
 #import "MCSResourceUsageLog.h"
 #import "MCSResourceDefines.h"
 #import "MCSResourcePartialContent.h"
-@protocol MCSResourcePartialContentDelegate;
 
 NS_ASSUME_NONNULL_BEGIN
 @interface MCSResourcePartialContent (MCSPrivate)<MCSReadWrite>
-@property (nonatomic, weak, nullable) id<MCSResourcePartialContentDelegate> delegate;
 @property (nonatomic, readonly) NSInteger readWriteCount;
 - (void)readWrite_retain;
 - (void)readWrite_release;
+- (void)didWriteDataWithLength:(NSUInteger)length;
 @end
 
-@protocol MCSResourcePartialContentDelegate <NSObject>
-- (void)readWriteCountDidChangeForPartialContent:(MCSResourcePartialContent *)content;
-- (void)partialContent:(MCSResourcePartialContent *)content didWriteDataWithLength:(NSUInteger)length;
-@end
-
-@interface MCSResource (Private)<MCSResourcePartialContentDelegate>
+@interface MCSResource (Private)<MCSReadWrite>
 @property (nonatomic, strong, readonly) dispatch_queue_t queue;
 @property (nonatomic) NSInteger id;
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, strong) MCSResourceUsageLog *log;
-@property (nonatomic) BOOL isCacheFinished;
+
+#pragma mark -
 @property (nonatomic, readonly) NSInteger readWriteCount;
 - (void)readWrite_retain;
 - (void)readWrite_release;
 
 #pragma mark -
 
-@property (nonatomic, copy, readonly, nullable) NSArray<MCSResourcePartialContent *> *contents;
-- (void)addContents:(NSArray<MCSResourcePartialContent *> *)contents;
-- (void)addContent:(MCSResourcePartialContent *)content;
-
-- (void)removeContent:(MCSResourcePartialContent *)content;
-
-- (NSString *)filePathOfContent:(MCSResourcePartialContent *)content;
+- (void)_addContents:(nullable NSArray<MCSResourcePartialContent *> *)contents;
+- (void)_addContent:(MCSResourcePartialContent *)content;
+- (void)_removeContent:(MCSResourcePartialContent *)content;
+- (void)_removeContents:(NSArray<MCSResourcePartialContent *> *)contents;
+- (void)_contentsDidChange:(NSArray<MCSResourcePartialContent *> *)contents;
+- (void)_didWriteDataForContent:(MCSResourcePartialContent *)content length:(NSUInteger)length;
 @end
 NS_ASSUME_NONNULL_END

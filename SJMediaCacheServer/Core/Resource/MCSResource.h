@@ -7,14 +7,24 @@
 //
 
 #import "MCSInterfaces.h"
-@class MCSResourceUsageLog;
+@class MCSResourceUsageLog, MCSResourcePartialContent;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface MCSResource : NSObject<MCSResource>
+@interface MCSResource : NSObject<MCSResource> {
+    @protected
+    NSMutableArray<__kindof MCSResourcePartialContent *> *_m;
+    BOOL _isCacheFinished;
+    NSString *_name;
+}
+
+- (instancetype)initWithName:(NSString *)name;
+
 @property (nonatomic, readonly) MCSResourceType type;
 
 - (id<MCSResourceReader>)readerWithRequest:(NSURLRequest *)request;
+
+@property (nonatomic, copy, readonly, nullable) NSArray<MCSResourcePartialContent *> *contents;
 
 @property (nonatomic, strong, readonly) id<MCSConfiguration> configuration;
 
@@ -23,6 +33,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) BOOL isCacheFinished;
 
 - (nullable NSURL *)playbackURLForCacheWithURL:(NSURL *)URL;
+
+- (void)prepareForReader;
+
+- (nullable MCSResourcePartialContent *)partialContentForNetworkDataReaderWithProxyURL:(NSURL *)proxyURL response:(NSHTTPURLResponse *)response;
+- (NSString *)filePathOfContent:(MCSResourcePartialContent *)content;
+- (void)didWriteDataForContent:(MCSResourcePartialContent *)content length:(NSUInteger)length;
+- (void)willReadContent:(MCSResourcePartialContent *)content;
+- (void)didEndReadContent:(MCSResourcePartialContent *)content;
 
 @end
 

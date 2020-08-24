@@ -10,12 +10,9 @@
 #import "MCSResourceManager.h"
 #import "MCSHLSReader.h"
 #import "MCSHLSParser.h"
-#import "MCSFileManager.h" 
-
-@interface MCSHLSResource ()
-@property (nonatomic) NSUInteger TsCount;
-@end
-
+#import "MCSFileManager.h"
+#import "MCSQueue.h"
+ 
 @implementation MCSHLSResource
 
 - (MCSResourceType)type {
@@ -26,91 +23,161 @@
     return [MCSHLSReader.alloc initWithResource:self request:request];
 }
  
-- (void)addContents:(NSArray<MCSResourcePartialContent *> *)contents {
-    [super addContents:contents];
-    [self _contentsDidChange];
-}
-
 - (NSURL *)playbackURLForCacheWithURL:(NSURL *)URL {
     return [MCSURLRecognizer.shared proxyURLWithURL:URL];
 }
 
+- (void)prepareForReader {
+    _parser = [MCSHLSParser parserInResourceIfExists:_name];
+    [self _addContents:[MCSFileManager getContentsInResource:_name]];
+}
+
+- (void)parseDidFinish:(MCSHLSParser *)parser {
+    self.parser = parser;
+}
+
 @synthesize parser = _parser;
 - (void)setParser:(MCSHLSParser *)parser {
-    dispatch_barrier_sync(self.queue, ^{
-        self->_parser = parser;
-        self->_TsCount = parser.TsCount;
-        [MCSResourceManager.shared saveMetadata:self];
+    dispatch_barrier_sync(MCSResourceQueue(), ^{
+        _parser = parser;
     });
 }
 
 - (MCSHLSParser *)parser {
     __block MCSHLSParser *parser = nil;
-    dispatch_sync(self.queue, ^{
+    dispatch_sync(MCSResourceQueue(), ^{
         parser = _parser;
     });
     return parser;
 }
+ 
+#pragma mark -
 
-@synthesize TsContentType = _TsContentType;
-- (NSString *)TsContentType {
-    __block NSString *TsContentType = nil;
-    dispatch_sync(self.queue, ^{
-        TsContentType = _TsContentType;
+- (nullable __kindof MCSResourcePartialContent *)partialContentForFileDataReaderWithProxyURL:(NSURL *)proxyURL {
+    MCSDataType dataType = [MCSURLRecognizer.shared dataTypeForProxyURL:proxyURL];
+    NSString *extension = nil;
+    switch ( dataType ) {
+        case MCSDataTypeHLSAESKey:
+            extension = MCSHLSAESKeyFileExtension;
+            break;
+        case MCSDataTypeHLSTs:
+            extension = MCSHLSTsFileExtension;
+            break;
+        default:
+            assert("Invalid data type!");
+            break;
+    }
+
+    if ( extension == nil )
+        return nil;
+    
+    __block MCSHLSPartialContent *content = nil;
+    dispatch_barrier_sync(MCSResourceQueue(), ^{
+        NSString *name = [MCSURLRecognizer.shared nameWithUrl:proxyURL.absoluteString extension:extension];
+        for ( MCSHLSPartialContent *c in _m.copy ) {
+            if ( c.type == dataType && [c.name isEqualToString:name] && c.length == c.totalLength) {
+                content = c;
+                break;
+            }
+        }
     });
-    return TsContentType;
+    return content;
 }
 
-- (void)readWriteCountDidChangeForPartialContent:(MCSResourcePartialContent *)content {
-    dispatch_barrier_sync(self.queue, ^{
-        if ( self.isCacheFinished )
+- (nullable MCSResourcePartialContent *)partialContentForNetworkDataReaderWithProxyURL:(NSURL *)proxyURL response:(NSHTTPURLResponse *)response {
+    __block MCSHLSPartialContent *_Nullable content = nil;
+    dispatch_barrier_sync(MCSResourceQueue(), ^{
+        MCSDataType dataType = [MCSURLRecognizer.shared dataTypeForProxyURL:proxyURL];
+        NSUInteger totalLength = (NSUInteger)response.expectedContentLength;
+        NSAssert(totalLength != 0, @"The content totalLength must be greater than 0!");
+        
+        switch ( dataType ) {
+            case MCSDataTypeHLSAESKey: {
+                NSString *AESKeyName = [MCSURLRecognizer.shared nameWithUrl:proxyURL.absoluteString extension:MCSHLSAESKeyFileExtension];
+                NSString *filename = [MCSFileManager hls_createAESKeyFileInResource:_name AESKeyName:AESKeyName totalLength:totalLength];
+                content = [MCSHLSPartialContent AESKeyPartialContentWithFilename:filename name:AESKeyName totalLength:totalLength length:0];
+            }
+                break;
+            case MCSDataTypeHLSTs: {
+                NSString *TsName = [MCSURLRecognizer.shared nameWithUrl:proxyURL.absoluteString extension:MCSHLSTsFileExtension];
+                NSString *filename = [MCSFileManager hls_createTsFileInResource:_name tsName:TsName tsTotalLength:totalLength];
+                content = [MCSHLSPartialContent TsPartialContentWithFilename:filename name:TsName totalLength:totalLength length:0];
+            }
+                break;
+            default:
+                assert("Invalid data type!");
+                break;
+        }
+        if ( content != nil ) {
+            [content readWrite_retain];
+            [self _addContent:content];
+        }
+    });
+    return content;
+}
+
+- (void)willReadContent:(MCSResourcePartialContent *)content {
+    dispatch_barrier_sync(MCSResourceQueue(), ^{
+        [content readWrite_retain];
+    });
+}
+
+- (void)didEndReadContent:(MCSResourcePartialContent *)content {
+    dispatch_barrier_sync(MCSResourceQueue(), ^{
+        if ( _isCacheFinished )
             return;
-        if ( content.readWriteCount > 0 )
+        
+        if ( _m.count < 2 )
             return;
-        if ( self.contents.count <= 1 )
-            return;
-        NSMutableArray<MCSResourcePartialContent *> *list = NSMutableArray.alloc.init;
-        for ( MCSResourcePartialContent *content in self.contents ) {
-            if ( content.readWriteCount == 0 )
-                [list addObject:content];
+        
+        NSMutableArray<MCSHLSPartialContent *> *contents = NSMutableArray.alloc.init;
+        for ( MCSHLSPartialContent *c in _m.copy ) {
+            if ( c.readWriteCount == 0 ) {
+                [contents addObject:c];
+            }
         }
         
-        if ( list.count <= 1 )
-            return;
+        NSMutableArray<MCSResourcePartialContent *> *deleteList = NSMutableArray.alloc.init;
         
-        NSMutableArray<MCSResourcePartialContent *> *deleteContents = NSMutableArray.alloc.init;
-        for ( NSInteger i = 0 ; i < list.count ; ++ i ) {
-            MCSResourcePartialContent *obj1 = list[i];
-            for ( NSInteger j = i + 1 ; j < list.count ; ++ j ) {
-                MCSResourcePartialContent *obj2 = list[j];
-                if ( [obj1.tsName isEqualToString:obj2.tsName] ) {
-                    [deleteContents addObject:obj1.length >= obj2.length ? obj2 : obj1];
+        if ( contents.count > 1 ) {
+            [contents sortUsingComparator:^NSComparisonResult(MCSHLSPartialContent *_Nonnull obj1, MCSHLSPartialContent *_Nonnull obj2) {
+                if ( [obj1.name isEqualToString:obj2.name] ) {
+                    return obj1.length > obj2.length ? NSOrderedAscending : NSOrderedDescending;
                 }
-                else if ( [obj1.AESKeyName isEqualToString:obj2.AESKeyName] ) {
-                    [deleteContents addObject:obj1.length >= obj2.length ? obj2 : obj1];
+                return [obj1.name compare:obj2.name];
+            }];
+            
+            for ( NSInteger i = 0 ; i < contents.count ; ++ i ) {
+                MCSHLSPartialContent *obj1 = contents[i];
+                if ( obj1.length == obj1.totalLength ) {
+                    for ( NSInteger j = i + 1 ; j < contents.count ; ++ j ) {
+                        MCSHLSPartialContent *obj2 = contents[j];
+                        if ( [obj1.name isEqualToString:obj2.name] ) {
+                            [deleteList addObject:obj2];
+                            ++ i;
+                        }
+                        else {
+                            break;
+                        }
+                    }
                 }
             }
         }
         
-        if ( deleteContents.count == 0 )
+        if ( deleteList.count == 0 )
             return;
-         
-        for ( MCSResourcePartialContent *content in deleteContents ) {
-            [self removeContent:content];
-        }
         
-        [self _contentsDidChange];
+        [self _removeContents:deleteList];
     });
 }
 
-- (void)_contentsDidChange {
-    NSArray *contents = self.contents.copy;
-    
+- (void)_contentsDidChange:(NSArray<__kindof MCSResourcePartialContent *> *)contents {
     BOOL isContentsFinished = YES;
     NSUInteger count = 0;
-    for ( MCSResourcePartialContent *content in contents ) {
-        if ( content.tsName != nil ) {
-            if ( content.length != content.tsTotalLength ) {
+    for ( __kindof MCSResourcePartialContent *c in contents ) {
+        if ( c.type == MCSDataTypeHLSTs ) {
+            MCSHLSPartialContent *content = c;
+            if ( content.length != content.totalLength ) {
                 isContentsFinished = NO;
                 break;
             }
@@ -118,47 +185,6 @@
         }
     }
     
-    self.isCacheFinished = isContentsFinished && count == _TsCount;
+    _isCacheFinished = isContentsFinished && count == _parser.TsCount;
 }
-
- 
-#pragma mark -
-
-
-- (NSString *)filePathOfContent:(MCSResourcePartialContent *)content {
-    return [MCSFileManager getFilePathWithName:content.filename inResource:self.name];
-}
-
-- (void)updateTsContentType:(NSString * _Nullable)TsContentType {
-    dispatch_barrier_sync(self.queue, ^{
-        self->_TsContentType = TsContentType;
-        [MCSResourceManager.shared saveMetadata:self];
-    });
-}
-
-- (nullable MCSResourcePartialContent *)contentForTsURL:(NSURL *)URL {
-    MCSResourcePartialContent *content = nil;
-    NSString *TsName = [MCSURLRecognizer.shared nameWithUrl:URL.absoluteString extension:MCSHLSTsFileExtension];
-    for ( MCSResourcePartialContent *c in self.contents ) {
-        if ( [c.tsName isEqualToString:TsName] ) {
-            NSString *contentPath = [MCSFileManager getFilePathWithName:c.filename inResource:self.name];
-            NSUInteger length = [MCSFileManager fileSizeAtPath:contentPath];
-            if ( length == c.tsTotalLength ) {
-                content = c;
-                break;
-            }
-        }
-    }
-    return content;
-}
-
-- (MCSResourcePartialContent *)createContentWithTsURL:(NSURL *)URL totalLength:(NSUInteger)totalLength {
-    MCSResourcePartialContent *content = nil;
-    NSString *TsName = [MCSURLRecognizer.shared nameWithUrl:URL.absoluteString extension:MCSHLSTsFileExtension];
-    NSString *filename = [MCSFileManager hls_createContentFileInResource:self.name tsName:TsName tsTotalLength:totalLength];
-    content = [MCSResourcePartialContent.alloc initWithFilename:filename tsName:TsName tsTotalLength:totalLength length:0];
-    [self addContent:content];
-    return content;
-}
-
 @end

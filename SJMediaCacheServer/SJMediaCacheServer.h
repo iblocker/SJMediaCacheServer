@@ -29,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
  
 /// The maximum number of queued prefetch tasks that can execute at same time.
 ///
-///     The default value is 3.
+///     The default value is 1.
 ///
 @property (nonatomic) NSInteger maxConcurrentPrefetchCount;
 
@@ -129,6 +129,12 @@ NS_ASSUME_NONNULL_BEGIN
 ///     If yes, the log will be output on the console. The default value is NO.
 ///
 @property (nonatomic, getter=isEnabledConsoleLog) BOOL enabledConsoleLog; // 是否开启控制日志
+
+/// Set more options to output more detailed log.
+///
+///     The default value is MCSLogOptionDefault.
+///
+@property (nonatomic) MCSLogOptions logOptions; // 设置日志选项, 以提供更加详细的日志.
 
 @end
 

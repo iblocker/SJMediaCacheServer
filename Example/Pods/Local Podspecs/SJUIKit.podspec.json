@@ -1,6 +1,6 @@
 {
   "name": "SJUIKit",
-  "version": "0.0.0.48",
+  "version": "0.0.0.50",
   "summary": "SJUIKit.",
   "description": "`Objective-C` UIKit",
   "homepage": "https://gitee.com/changsanjiang/SJUIKit",
@@ -12,8 +12,8 @@
     "changsanjiang@gmail.com": "changsanjiang@gmail.com"
   },
   "source": {
-    "git": "https://gitee.com/changsanjiang/SJUIKit.git",
-    "tag": "0.0.0.48"
+    "git": "https://github.com/changsanjiang/SJUIKit.git",
+    "tag": "0.0.0.50"
   },
   "platforms": {
     "ios": "8.0"

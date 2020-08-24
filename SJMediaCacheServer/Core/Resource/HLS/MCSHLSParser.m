@@ -12,6 +12,7 @@
 #import "MCSData.h"
 #import "MCSURLRecognizer.h"
 #import "NSURLRequest+MCS.h"
+#import "MCSQueue.h"
 
 #define MCSURIMatchingPattern_Index     @".*\\.m3u8[^\\s]*"
 #define MCSURIMatchingPattern_Ts        @".*\\.ts[^\\s]*"
@@ -34,13 +35,36 @@
 @end
 
 @implementation MCSHLSParser
+
++ (nullable instancetype)parserInResourceIfExists:(NSString *)resourceName {
+    NSParameterAssert(resourceName);
+    NSString *indexFilePath = [MCSFileManager hls_indexFilePathInResource:resourceName];
+    // 已解析过, 将直接读取本地
+    if ( [MCSFileManager fileExistsAtPath:indexFilePath] ) {
+        MCSHLSParser *parser = MCSHLSParser.alloc.init;
+        parser->_resourceName = resourceName;
+        [parser _finished];
+        return parser;
+    }
+    return nil;
+}
+
 - (instancetype)initWithResource:(NSString *)resourceName request:(NSURLRequest *)request networkTaskPriority:(float)networkTaskPriority delegate:(id<MCSHLSParserDelegate>)delegate {
-    self = [super init];
+    self = [self init];
     if ( self ) {
+        NSParameterAssert(resourceName);
+        
         _networkTaskPriority = networkTaskPriority;
         _resourceName = resourceName;
         _request = request;
         _delegate = delegate;
+    }
+    return self;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if ( self ) {
         _queue = dispatch_get_global_queue(0, 0);
     }
     return self;
@@ -211,7 +235,9 @@
         error = [NSError mcs_HLSFileParseError:_request.URL];
     }
     
-    [_delegate parser:self anErrorOccurred:error];
+    dispatch_async(MCSDelegateQueue(), ^{
+        [self->_delegate parser:self anErrorOccurred:error];
+    });
 }
 
 - (void)_finished {
@@ -247,7 +273,9 @@
     
     _isDone = YES;
     
-    [_delegate parserParseDidFinish:self];
+    dispatch_async(MCSDelegateQueue(), ^{
+        [self->_delegate parserParseDidFinish:self];
+    });
 }
 @end
 

@@ -87,6 +87,8 @@ MCSMD5(NSString *str) {
 
 // 此处的URL参数可能为代理URL也可能为原始URL
 - (NSString *)resourceNameForURL:(NSURL *)URL {
+    NSParameterAssert(URL.host);
+    
     NSString *url = URL.absoluteString;
     
     // 判断是否为代理URL
@@ -113,6 +115,16 @@ MCSMD5(NSString *str) {
     return [URL.absoluteString containsString:MCSHLSIndexFileExtension] ||
            [URL.absoluteString containsString:MCSHLSTsFileExtension] ||
            [URL.absoluteString containsString:MCSHLSAESKeyFileExtension] ? MCSResourceTypeHLS : MCSResourceTypeVOD;
+}
+
+- (MCSDataType)dataTypeForProxyURL:(NSURL *)URL {
+    if ( [URL.absoluteString containsString:MCSHLSIndexFileExtension] )
+        return MCSDataTypeHLSPlaylist;
+    if ( [URL.absoluteString containsString:MCSHLSTsFileExtension] )
+        return MCSDataTypeHLSTs;
+    if ( [URL.absoluteString containsString:MCSHLSAESKeyFileExtension] )
+        return MCSDataTypeHLSAESKey;
+    return MCSDataTypeVOD;
 }
 
 - (NSString *)nameWithUrl:(NSString *)url extension:(NSString *)extension {
@@ -143,6 +155,8 @@ MCSMD5(NSString *str) {
 }
 
 - (NSString *)proxyTsURIWithUrl:(NSString *)url inResource:(NSString *)resource {
+    NSParameterAssert(resource);
+    
     // format: mcsproxy/resource/tsName.ts?url=base64EncodedUrl
     return [self _proxyURIWithUrl:url inResource:resource extension:MCSHLSTsFileExtension];
 }

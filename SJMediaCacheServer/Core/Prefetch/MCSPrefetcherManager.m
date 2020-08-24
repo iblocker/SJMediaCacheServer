@@ -76,13 +76,12 @@
         }
         
         MCSResourceType type = [MCSURLRecognizer.shared resourceTypeForURL:self->_URL];
-        id<MCSPrefetcherDelegate> delegate = self->_mcs_progressBlock != nil || self->_mcs_completionBlock != nil ? self : nil;
         switch ( type ) {
             case MCSResourceTypeVOD:
-                self->_prefetcher = [MCSVODPrefetcher.alloc initWithURL:self->_URL preloadSize:self->_preloadSize delegate:delegate delegateQueue:dispatch_get_main_queue()];
+                self->_prefetcher = [MCSVODPrefetcher.alloc initWithURL:self->_URL preloadSize:self->_preloadSize delegate:self delegateQueue:dispatch_get_main_queue()];
                 break;
             case MCSResourceTypeHLS:
-                self->_prefetcher = [MCSHLSPrefetcher.alloc initWithURL:self->_URL preloadSize:self->_preloadSize delegate:delegate delegateQueue:dispatch_get_main_queue()];
+                self->_prefetcher = [MCSHLSPrefetcher.alloc initWithURL:self->_URL preloadSize:self->_preloadSize delegate:self delegateQueue:dispatch_get_main_queue()];
                 break;
         }
         [self->_prefetcher prepare];
@@ -168,7 +167,7 @@
     self = [super init];
     if ( self ) {
         _operationQueue = NSOperationQueue.alloc.init;
-        _operationQueue.maxConcurrentOperationCount = 3;
+        _operationQueue.maxConcurrentOperationCount = 1;
         _operationQueue.qualityOfService = NSQualityOfServiceBackground;
     }
     return self;
